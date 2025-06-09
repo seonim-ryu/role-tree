@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>역할 트리 시각화</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
     <style>
         body {
             margin: 0;
@@ -106,11 +107,6 @@
         }
         .role-content {
             flex: 1;
-        }
-        .role-name {
-            font-weight: bold;
-            color: #333;
-            display: block;
         }
         .role-id {
             color: #666;
@@ -227,7 +223,10 @@
             background: #f0f0f0;
         }
         .toggle-btn.collapsed {
-            transform: rotate(-90deg);
+            /* transform 스타일 제거 */
+        }
+        .node.expanded > .role-card > .role-header > .toggle-btn::before {
+            content: '[-]';
         }
         .children {
             position: relative;
@@ -303,6 +302,47 @@
         .role-card.denied {
             border-color: #f44336;
             background-color: #ffebee;
+        }
+        .toggle-children {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 4px;
+            margin-right: 8px;
+            color: #666;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            transition: none;
+        }
+        .toggle-children:hover {
+            background-color: #f0f0f0;
+        }
+        .toggle-children::before {
+            content: '[+]';
+            display: inline-block;
+            font-size: 14px;
+            font-weight: bold;
+            transition: none;
+        }
+        .node.expanded > .role-card > .role-header > .toggle-children::before {
+            content: '[-]';
+        }
+        .role-header {
+            display: flex;
+            align-items: center;
+            padding: 8px;
+            background: #f8f9fa;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+        .role-name {
+            font-weight: bold;
+            margin-right: 8px;
         }
     </style>
 </head>
@@ -423,9 +463,8 @@
                 const content = document.createElement('div');
                 content.className = 'role-content';
                 content.innerHTML = `
-                    <span class="role-name">${node.role.roleName}</span>
                     <span class="role-id">${node.role.roleId}</span>
-                    <span class="role-type ${roleType}">${roleType}</span>
+                    <span class="role-type ${node.role.categoryTypeCode === 'PERMISSION' ? 'PERMISSION' : roleType}">${node.role.categoryTypeCode === 'PERMISSION' ? '[권한]' : '[역할]'}</span>
                 `;
                 card.appendChild(content);
 
@@ -452,6 +491,23 @@
                     denyCheckbox.addEventListener('change', (e) => {
                         const isChecked = e.target.checked;
                         const roleId = node.role.roleId;
+
+                        // 커스텀 이벤트 생성 및 발생
+                        const denyEvent = new CustomEvent('denyCheckboxChanged', {
+                            detail: {
+                                checkbox: e.target,
+                                roleId: roleId,
+                                isChecked: isChecked,
+                                node: node
+                            }
+                        });
+                        document.dispatchEvent(denyEvent);
+
+                        // 같은 roleId를 가진 모든 노드의 체크박스 상태 동기화
+                        const allCheckboxes = document.querySelectorAll(`.node[data-role-id="${roleId}"] input[type="checkbox"]`);
+                        allCheckboxes.forEach(checkbox => {
+                            checkbox.checked = isChecked;
+                        });
 
                         // 현재 노드의 모든 하위 노드 찾기
                         const findChildNodes = (currentNode) => {
@@ -481,34 +537,36 @@
                                     roleCard.classList.toggle('denied', isChecked);
                                 }
 
-                                // disabled된 체크박스의 roleId를 가진 모든 트리 노드 찾기
-                                if (checkbox.disabled) {
+                                // disabled된 체크박스의 roleId와 동일한 다른 하위 노드들 찾기
+                                if (isChecked) {
                                     const disabledRoleId = childNode.dataset.roleId;
-                                    const allNodesWithSameRoleId = document.querySelectorAll(`.node[data-role-id="${disabledRoleId}"]`);
-                                    allNodesWithSameRoleId.forEach(node => {
-                                        const nodeCheckbox = node.querySelector('input[type="checkbox"]');
-                                        if (nodeCheckbox) {
-                                            nodeCheckbox.disabled = true;
+                                    const allNodes = document.querySelectorAll('.node');
+                                    allNodes.forEach(otherNode => {
+                                        if (otherNode !== childNode && otherNode.dataset.roleId === disabledRoleId) {
+                                            const otherCheckbox = otherNode.querySelector('input[type="checkbox"]');
+                                            if (otherCheckbox) {
+                                                otherCheckbox.disabled = true;
+                                                otherCheckbox.checked = true;
+                                                const otherRoleCard = otherCheckbox.closest('.role-card');
+                                                if (otherRoleCard) {
+                                                    otherRoleCard.classList.add('denied');
+                                                }
+                                            }
                                         }
                                     });
                                 } else {
-                                    // 체크박스가 활성화될 때, 해당 roleId를 가진 모든 노드의 체크박스도 활성화
-                                    const enabledRoleId = childNode.dataset.roleId;
-                                    const allNodesWithSameRoleId = document.querySelectorAll(`.node[data-role-id="${enabledRoleId}"]`);
-                                    allNodesWithSameRoleId.forEach(node => {
-                                        const nodeCheckbox = node.querySelector('input[type="checkbox"]');
-                                        if (nodeCheckbox) {
-                                            nodeCheckbox.disabled = false;
+                                    // 부모 노드의 체크박스가 해제되면 모든 disabled된 체크박스 활성화
+                                    const allDisabledCheckboxes = document.querySelectorAll('input[type="checkbox"]:disabled');
+                                    allDisabledCheckboxes.forEach(disabledCheckbox => {
+                                        disabledCheckbox.disabled = false;
+                                        disabledCheckbox.checked = false;
+                                        const disabledRoleCard = disabledCheckbox.closest('.role-card');
+                                        if (disabledRoleCard) {
+                                            disabledRoleCard.classList.remove('denied');
                                         }
                                     });
                                 }
                             }
-                        });
-
-                        // 같은 roleId를 가진 모든 노드의 체크박스 상태 동기화
-                        const allCheckboxes = document.querySelectorAll(`.node[data-role-id="${roleId}"] input[type="checkbox"]`);
-                        allCheckboxes.forEach(checkbox => {
-                            checkbox.checked = isChecked;
                         });
                     });
                     actions.appendChild(denyCheckbox);
@@ -625,6 +683,8 @@
                 if (topRole.roleId === roleId) {
                     // 1뎁스 노드 찾기
                     const firstLevelNode = document.querySelector(`#roleTree > .node[data-role-id="${roleId}"]`);
+
+                    console.log('===>', firstLevelNode)
 
                     if (firstLevelNode) {
                         const actions = firstLevelNode.querySelector('.role-actions');
