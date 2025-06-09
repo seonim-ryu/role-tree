@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>역할 트리 시각화</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .search-container {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        #searchInput {
+            padding: 8px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .tree-controls {
+            display: flex;
+            gap: 10px;
+        }
+        .tree-control-btn {
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .tree-control-btn:hover {
+            background: #f0f0f0;
+        }
+        .tree-container {
+            padding: 20px;
+            position: relative;
+        }
+        .node {
+            position: relative;
+            padding: 8px;
+            margin: 4px 0;
+            border-radius: 4px;
+            background: white;
+        }
+        .node-content {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            gap: 8px;
+            position: relative;
+        }
+        .node-name {
+            flex: 1;
+            min-width: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .node-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .deny-checkbox {
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .deny-checkbox:disabled + label {
+            color: #999;
+            cursor: not-allowed;
+        }
+        .role-card {
+            display: inline-flex;
+            align-items: center;
+            padding: 10px 15px;
+            margin: 5px 0;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            min-width: 200px;
+            width: 100%;
+            justify-content: space-between;
+        }
+        .role-card:hover {
+            background: #f8f9fa;
+            transform: translateX(5px);
+        }
+        .role-card.selected {
+            background: #e3f2fd;
+            border-color: #2196f3;
+        }
+        .role-content {
+            flex: 1;
+        }
+        .role-name {
+            font-weight: bold;
+            color: #333;
+            display: block;
+        }
+        .role-id {
+            color: #666;
+            font-size: 0.9em;
+            display: block;
+            margin-top: 4px;
+        }
+        .role-type {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            margin-top: 4px;
+        }
+        .ADMIN { background: #ffcdd2; }
+        .MEMBER { background: #c8e6c9; }
+        .VIEWER { background: #bbdefb; }
+        .PERMISSION { background: #fff9c4; }
+        .highlight {
+            background: #ffecb3;
+        }
+        .role-details {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .role-details-header {
+            padding: 15px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+        }
+        .role-details-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        .role-details-content {
+            padding: 15px;
+            transition: all 0.3s ease;
+            max-height: 500px;
+            overflow: hidden;
+        }
+        .role-details.collapsed .role-details-content {
+            max-height: 0;
+            padding-top: 0;
+            padding-bottom: 0;
+        }
+        .role-details p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .role-details strong {
+            color: #333;
+        }
+        .toggle-details {
+            cursor: pointer;
+            padding: 4px;
+            border: none;
+            background: none;
+            color: #666;
+            font-size: 16px;
+            transition: transform 0.3s ease;
+        }
+        .toggle-details:hover {
+            color: #333;
+        }
+        .role-details.collapsed .toggle-details {
+            transform: rotate(180deg);
+        }
+        .role-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 10px;
+            align-items: center;
+        }
+        .condition-btn {
+            padding: 4px 8px;
+            border: 1px solid #2196f3;
+            border-radius: 4px;
+            background: white;
+            color: #2196f3;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .condition-btn:hover {
+            background: #2196f3;
+            color: white;
+        }
+        .deny-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+        .deny-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .deny-checkbox input[type="checkbox"]:checked {
+            accent-color: #f44336;
+        }
+        .deny-icon {
+            color: #f44336;
+            margin-left: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        .deny-icon.visible {
+            display: inline-block;
+        }
+        .role-card.denied {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
+        .toggle-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 24px;
+            height: 24px;
+            margin-right: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: white;
+            cursor: pointer;
+            user-select: none;
+            font-size: 12px;
+            transition: transform 0.3s ease;
+        }
+        .toggle-btn:hover {
+            background: #f0f0f0;
+        }
+        .toggle-btn.collapsed {
+            transform: rotate(-90deg);
+        }
+        .children {
+            position: relative;
+            margin-left: 30px;
+            padding-left: 15px;
+        }
+        .children::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 1px;
+            background-color: #ddd;
+        }
+        .children .node::before {
+            content: '';
+            position: absolute;
+            left: -15px;
+            top: 50%;
+            width: 15px;
+            height: 1px;
+            background-color: #ddd;
+        }
+        .children.collapsed {
+            display: none;
+        }
+        .tree-node {
+            position: relative;
+        }
+        .tree-node::before {
+            content: '';
+            position: absolute;
+            left: -15px;
+            top: 50%;
+            width: 15px;
+            height: 1px;
+            background-color: #ddd;
+        }
+        .tree-node:first-child::before {
+            display: none;
+        }
+        .tree-node:last-child::before {
+            display: none;
+        }
+        .tree-node:only-child::before {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="search-container">
+            <input type="text" id="searchInput" placeholder="역할 ID 또는 이름으로 검색...">
+            <div class="tree-controls">
+                <button class="tree-control-btn" id="expandAll">모두 펼치기</button>
+                <button class="tree-control-btn" id="collapseAll">모두 접기</button>
+            </div>
+        </div>
+        <div class="tree-container">
+            <div id="roleTree"></div>
+        </div>
+        <div id="roleDetails" class="role-details">
+            <div class="role-details-header">
+                <h3>역할 상세 정보</h3>
+                <button class="toggle-details" title="접기/펼치기">▼</button>
+            </div>
+            <div class="role-details-content">
+                <p>역할을 선택하면 상세 정보가 표시됩니다.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="./tree2.js"></script>
+    <script src="./top-role.js"></script>
+
+    <script type="module">
+        import { roleList } from './tree2.js';
+        import { topRoles } from './top-role.js';
+
+        class RoleNode {
+            constructor(role) {
+                this.role = role;
+                this.children = [];
+                this.parent = null;
+            }
+        }
+
+        class RoleTree {
+            constructor(topRoles, allRoles) {
+                this.topRoles = topRoles;
+                this.allRoles = allRoles;
+                this.roleMap = new Map();
+                this.rootNodes = [];
+                this.buildTree();
+            }
+
+            buildTree() {
+                // 모든 역할을 노드로 변환
+                this.allRoles.forEach(role => {
+                    this.roleMap.set(role.roleId, new RoleNode(role));
+                });
+
+                // 최상위 역할들을 루트 노드로 설정
+                this.topRoles.forEach(role => {
+                    const node = new RoleNode(role);
+                    this.roleMap.set(role.roleId, node);
+                    this.rootNodes.push(node);
+                });
+
+                // 부모-자식 관계 설정
+                this.allRoles.forEach(role => {
+                    const node = this.roleMap.get(role.roleId);
+                    if (role.parentRoleIds && role.parentRoleIds.length > 0) {
+                        role.parentRoleIds.forEach(parentId => {
+                            const parentNode = this.roleMap.get(parentId);
+                            if (parentNode) {
+                                parentNode.children.push(node);
+                                node.parent = parentNode;
+                            }
+                        });
+                    }
+                });
+            }
+
+            render() {
+                const container = document.getElementById('roleTree');
+                container.innerHTML = '';
+                this.rootNodes.forEach(node => {
+                    container.appendChild(this.createNodeElement(node));
+                });
+            }
+
+            createNodeElement(node, depth = 0) {
+                const div = document.createElement('div');
+                div.className = 'node';
+                div.dataset.roleId = node.role.roleId;
+                
+                const hasChildren = node.children.length > 0;
+                const roleType = node.role.roleId.split('_').pop();
+                
+                const card = document.createElement('div');
+                card.className = 'role-card';
+                card.dataset.roleId = node.role.roleId;
+                
+                if (hasChildren) {
+                    const toggle = document.createElement('span');
+                    toggle.className = 'toggle-btn';
+                    toggle.textContent = '▼';
+                    toggle.onclick = (e) => {
+                        e.stopPropagation();
+                        const children = div.querySelector('.children');
+                        const isCollapsed = children.classList.contains('collapsed');
+                        children.classList.toggle('collapsed');
+                        toggle.classList.toggle('collapsed', isCollapsed);
+                        toggle.textContent = isCollapsed ? '▼' : '▶';
+                    };
+                    card.appendChild(toggle);
+                } else {
+                    const spacer = document.createElement('span');
+                    spacer.style.width = '32px';
+                    card.appendChild(spacer);
+                }
+
+                const content = document.createElement('div');
+                content.className = 'role-content';
+                content.innerHTML = `
+                    <span class="role-name">${node.role.roleName}</span>
+                    <span class="role-id">${node.role.roleId}</span>
+                    <span class="role-type ${roleType}">${roleType}</span>
+                `;
+                card.appendChild(content);
+
+                const actions = document.createElement('div');
+                actions.className = 'role-actions';
+
+                // 1뎁스 노드인 경우 조건 설정 버튼과 거부 아이콘 추가
+                if (depth === 0) {
+                    // 거부 아이콘 추가
+                    const denyIcon = document.createElement('span');
+                    denyIcon.className = 'deny-icon';
+                    denyIcon.innerHTML = '🚫';
+                    denyIcon.title = '하위 노드가 거부됨';
+                    denyIcon.style.display = 'none';
+                    actions.appendChild(denyIcon);
+
+                    const conditionBtn = document.createElement('button');
+                    conditionBtn.className = 'condition-btn';
+                    conditionBtn.textContent = '조건 설정';
+                    conditionBtn.onclick = (e) => {
+                        e.stopPropagation();
+                        this.showConditionSettings(node.role);
+                    };
+                    actions.appendChild(conditionBtn);
+                } else {
+                    // 1뎁스가 아닌 경우 거부 체크박스 추가
+                    const denyCheckbox = document.createElement('div');
+                    denyCheckbox.className = 'deny-checkbox';
+                    denyCheckbox.innerHTML = `
+                        <input type="checkbox" id="deny-${node.role.roleId}" 
+                               onchange="this.closest('.role-card').classList.toggle('denied', this.checked)">
+                        <label for="deny-${node.role.roleId}">거부</label>
+                    `;
+                    denyCheckbox.addEventListener('change', (e) => {
+                        const isChecked = e.target.checked;
+                        const roleId = node.role.roleId;
+
+                        // 최상위 노드에서 동일한 roleId를 가진 노드 찾기
+                        const topLevelNodes = document.querySelectorAll(`.node[data-role-id="${roleId}"]`);
+                        topLevelNodes.forEach(topNode => {
+                            const denyIcon = topNode.querySelector('.deny-icon');
+                            if (denyIcon) {
+                                denyIcon.style.display = isChecked ? 'inline' : 'none';
+                            }
+                        });
+
+                        // 같은 roleId를 가진 모든 노드의 체크박스 상태 동기화
+                        const allCheckboxes = document.querySelectorAll(`.node[data-role-id="${roleId}"] input[type="checkbox"]`);
+                        allCheckboxes.forEach(checkbox => {
+                            checkbox.checked = isChecked;
+                        });
+
+                        // 하위 역할의 체크박스 비활성화
+                        if (isChecked) {
+                            // 현재 노드의 하위 역할 ID 목록 가져오기
+                            const childRoleIds = node.role.childRoleIds || [];
+                            
+                            // 각 하위 역할 ID에 대해 체크박스 찾아서 비활성화
+                            childRoleIds.forEach(childRoleId => {
+                                const childCheckboxes = document.querySelectorAll(`.node[data-role-id="${childRoleId}"] input[type="checkbox"]`);
+                                childCheckboxes.forEach(checkbox => {
+                                    checkbox.setAttribute('disabled', 'disabled');
+                                    checkbox.checked = false;
+                                });
+                            });
+                        } else {
+                            // 체크박스 해제 시 하위 역할의 체크박스 활성화
+                            const childRoleIds = node.role.childRoleIds || [];
+                            childRoleIds.forEach(childRoleId => {
+                                const childCheckboxes = document.querySelectorAll(`.node[data-role-id="${childRoleId}"] input[type="checkbox"]`);
+                                childCheckboxes.forEach(checkbox => {
+                                    checkbox.removeAttribute('disabled');
+                                });
+                            });
+                        }
+                    });
+                    actions.appendChild(denyCheckbox);
+                }
+                
+                card.appendChild(actions);
+
+                card.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    this.showRoleDetails(node.role);
+                    document.querySelectorAll('.role-card').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    card.classList.add('selected');
+                });
+
+                div.appendChild(card);
+
+                if (hasChildren) {
+                    const childrenContainer = document.createElement('div');
+                    childrenContainer.className = 'children';
+                    node.children.forEach(child => {
+                        childrenContainer.appendChild(this.createNodeElement(child, depth + 1));
+                    });
+                    div.appendChild(childrenContainer);
+                }
+
+                return div;
+            }
+
+            showRoleDetails(role) {
+                const details = document.getElementById('roleDetails');
+                details.innerHTML = `
+                    <div class="role-details-header">
+                        <h3>${role.roleName}</h3>
+                        <button class="toggle-details" title="접기/펼치기">▼</button>
+                    </div>
+                    <div class="role-details-content">
+                        <p><strong>ID:</strong> ${role.roleId}</p>
+                        <p><strong>설명:</strong> ${role.description}</p>
+                        <p><strong>카테고리:</strong> ${role.categoryKey}</p>
+                        <p><strong>속성:</strong> ${role.roleProperties ? role.roleProperties.join(", ") : "없음"}</p>
+                        <p><strong>부모 역할:</strong> ${role.parentRoleIds ? role.parentRoleIds.join(", ") : "없음"}</p>
+                        <p><strong>자식 역할:</strong> ${role.childRoleIds ? role.childRoleIds.join(", ") : "없음"}</p>
+                    </div>
+                `;
+
+                // 접기/펼치기 버튼 이벤트 리스너 추가
+                const toggleBtn = details.querySelector('.toggle-details');
+                const header = details.querySelector('.role-details-header');
+                const toggleContent = () => {
+                    details.classList.toggle('collapsed');
+                };
+                
+                toggleBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    toggleContent();
+                });
+                
+                header.addEventListener('click', (e) => {
+                    if (e.target !== toggleBtn) {
+                        toggleContent();
+                    }
+                });
+            }
+
+            showConditionSettings(role) {
+                // 조건 설정 로직 구현
+                console.log('조건 설정:', role.roleId);
+                // TODO: 조건 설정 UI 구현
+            }
+
+            search(query) {
+                query = query.toLowerCase();
+                document.querySelectorAll('.role-card').forEach(card => {
+                    const roleId = card.dataset.roleId.toLowerCase();
+                    const roleName = card.querySelector('.role-name').textContent.toLowerCase();
+                    const isMatch = roleId.includes(query) || roleName.includes(query);
+                    card.classList.toggle('highlight', isMatch);
+                });
+            }
+
+            expandAll() {
+                document.querySelectorAll('.children').forEach(children => {
+                    children.classList.remove('collapsed');
+                });
+                document.querySelectorAll('.toggle-btn').forEach(btn => {
+                    btn.classList.remove('collapsed');
+                    btn.textContent = '▼';
+                });
+            }
+
+            collapseAll() {
+                document.querySelectorAll('.children').forEach(children => {
+                    children.classList.add('collapsed');
+                });
+                document.querySelectorAll('.toggle-btn').forEach(btn => {
+                    btn.classList.add('collapsed');
+                    btn.textContent = '▶';
+                });
+            }
+        }
+
+        // 트리 생성 및 렌더링
+        const roleTree = new RoleTree(topRoles, roleList);
+        roleTree.render();
+
+        // 검색 기능
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            roleTree.search(e.target.value);
+        });
+
+        // 모두 펼치기/접기 기능
+        document.getElementById('expandAll').addEventListener('click', () => {
+            roleTree.expandAll();
+        });
+
+        document.getElementById('collapseAll').addEventListener('click', () => {
+            roleTree.collapseAll();
+        });
+    </script>
+</body>
+</html> 
