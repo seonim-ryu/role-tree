@@ -78,13 +78,9 @@
             margin-left: auto;
             flex-shrink: 0;
         }
-        .deny-checkbox {
-            margin-left: auto;
-            flex-shrink: 0;
-        }
-        .deny-checkbox:disabled + label {
-            color: #999;
-            cursor: not-allowed;
+        .role-card.denied {
+            border-color: #f44336;
+            background-color: #ffebee;
         }
         .role-card {
             display: inline-flex;
@@ -212,34 +208,6 @@
             background: #2196f3;
             color: white;
         }
-        .deny-checkbox {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 12px;
-            color: #666;
-        }
-        .deny-checkbox input[type="checkbox"] {
-            width: 16px;
-            height: 16px;
-            cursor: pointer;
-        }
-        .deny-checkbox input[type="checkbox"]:checked {
-            accent-color: #f44336;
-        }
-        .deny-icon {
-            color: #f44336;
-            margin-left: 8px;
-            font-size: 14px;
-            display: none;
-        }
-        .deny-icon.visible {
-            display: inline-block;
-        }
-        .role-card.denied {
-            border-color: #f44336;
-            background-color: #ffebee;
-        }
         .toggle-btn {
             display: inline-flex;
             align-items: center;
@@ -308,6 +276,34 @@
         .tree-node:only-child::before {
             display: none;
         }
+        .deny-icon {
+            color: #f44336;
+            margin-left: 8px;
+            font-size: 14px;
+            display: none;
+        }
+        .deny-icon.visible {
+            display: inline-block;
+        }
+        .deny-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+        .deny-checkbox input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        .deny-checkbox input[type="checkbox"]:checked {
+            accent-color: #f44336;
+        }
+        .role-card.denied {
+            border-color: #f44336;
+            background-color: #ffebee;
+        }
     </style>
 </head>
 <body>
@@ -333,11 +329,11 @@
         </div>
     </div>
 
-    <script src="./tree2.js"></script>
+    <script src="./role-tree.js"></script>
     <script src="./top-role.js"></script>
 
     <script type="module">
-        import { roleList } from './tree2.js';
+        import { roleList } from './role-tree.js';
         import { topRoles } from './top-role.js';
 
         class RoleNode {
@@ -436,16 +432,7 @@
                 const actions = document.createElement('div');
                 actions.className = 'role-actions';
 
-                // 1뎁스 노드인 경우 조건 설정 버튼과 거부 아이콘 추가
                 if (depth === 0) {
-                    // 거부 아이콘 추가
-                    const denyIcon = document.createElement('span');
-                    denyIcon.className = 'deny-icon';
-                    denyIcon.innerHTML = '🚫';
-                    denyIcon.title = '하위 노드가 거부됨';
-                    denyIcon.style.display = 'none';
-                    actions.appendChild(denyIcon);
-
                     const conditionBtn = document.createElement('button');
                     conditionBtn.className = 'condition-btn';
                     conditionBtn.textContent = '조건 설정';
@@ -455,7 +442,6 @@
                     };
                     actions.appendChild(conditionBtn);
                 } else {
-                    // 1뎁스가 아닌 경우 거부 체크박스 추가
                     const denyCheckbox = document.createElement('div');
                     denyCheckbox.className = 'deny-checkbox';
                     denyCheckbox.innerHTML = `
@@ -467,12 +453,55 @@
                         const isChecked = e.target.checked;
                         const roleId = node.role.roleId;
 
-                        // 최상위 노드에서 동일한 roleId를 가진 노드 찾기
-                        const topLevelNodes = document.querySelectorAll(`.node[data-role-id="${roleId}"]`);
-                        topLevelNodes.forEach(topNode => {
-                            const denyIcon = topNode.querySelector('.deny-icon');
-                            if (denyIcon) {
-                                denyIcon.style.display = isChecked ? 'inline' : 'none';
+                        // 현재 노드의 모든 하위 노드 찾기
+                        const findChildNodes = (currentNode) => {
+                            const childNodes = [];
+                            const childrenContainer = currentNode.querySelector('.children');
+                            if (childrenContainer) {
+                                const nodes = childrenContainer.querySelectorAll('.node');
+                                nodes.forEach(node => {
+                                    childNodes.push(node);
+                                    childNodes.push(...findChildNodes(node));
+                                });
+                            }
+                            return childNodes;
+                        };
+
+                        // 현재 노드의 모든 하위 노드 찾기
+                        const childNodes = findChildNodes(div);
+
+                        // 하위 노드들의 체크박스 상태 변경
+                        childNodes.forEach(childNode => {
+                            const checkbox = childNode.querySelector('input[type="checkbox"]');
+                            if (checkbox) {
+                                checkbox.checked = isChecked;
+                                checkbox.disabled = isChecked;
+                                const roleCard = checkbox.closest('.role-card');
+                                if (roleCard) {
+                                    roleCard.classList.toggle('denied', isChecked);
+                                }
+
+                                // disabled된 체크박스의 roleId를 가진 모든 트리 노드 찾기
+                                if (checkbox.disabled) {
+                                    const disabledRoleId = childNode.dataset.roleId;
+                                    const allNodesWithSameRoleId = document.querySelectorAll(`.node[data-role-id="${disabledRoleId}"]`);
+                                    allNodesWithSameRoleId.forEach(node => {
+                                        const nodeCheckbox = node.querySelector('input[type="checkbox"]');
+                                        if (nodeCheckbox) {
+                                            nodeCheckbox.disabled = true;
+                                        }
+                                    });
+                                } else {
+                                    // 체크박스가 활성화될 때, 해당 roleId를 가진 모든 노드의 체크박스도 활성화
+                                    const enabledRoleId = childNode.dataset.roleId;
+                                    const allNodesWithSameRoleId = document.querySelectorAll(`.node[data-role-id="${enabledRoleId}"]`);
+                                    allNodesWithSameRoleId.forEach(node => {
+                                        const nodeCheckbox = node.querySelector('input[type="checkbox"]');
+                                        if (nodeCheckbox) {
+                                            nodeCheckbox.disabled = false;
+                                        }
+                                    });
+                                }
                             }
                         });
 
@@ -481,30 +510,6 @@
                         allCheckboxes.forEach(checkbox => {
                             checkbox.checked = isChecked;
                         });
-
-                        // 하위 역할의 체크박스 비활성화
-                        if (isChecked) {
-                            // 현재 노드의 하위 역할 ID 목록 가져오기
-                            const childRoleIds = node.role.childRoleIds || [];
-                            
-                            // 각 하위 역할 ID에 대해 체크박스 찾아서 비활성화
-                            childRoleIds.forEach(childRoleId => {
-                                const childCheckboxes = document.querySelectorAll(`.node[data-role-id="${childRoleId}"] input[type="checkbox"]`);
-                                childCheckboxes.forEach(checkbox => {
-                                    checkbox.setAttribute('disabled', 'disabled');
-                                    checkbox.checked = false;
-                                });
-                            });
-                        } else {
-                            // 체크박스 해제 시 하위 역할의 체크박스 활성화
-                            const childRoleIds = node.role.childRoleIds || [];
-                            childRoleIds.forEach(childRoleId => {
-                                const childCheckboxes = document.querySelectorAll(`.node[data-role-id="${childRoleId}"] input[type="checkbox"]`);
-                                childCheckboxes.forEach(checkbox => {
-                                    checkbox.removeAttribute('disabled');
-                                });
-                            });
-                        }
                     });
                     actions.appendChild(denyCheckbox);
                 }
@@ -610,6 +615,36 @@
         // 트리 생성 및 렌더링
         const roleTree = new RoleTree(topRoles, roleList);
         roleTree.render();
+
+        // denyCheckboxChanged 이벤트 리스너 추가
+        document.addEventListener('denyCheckboxChanged', (e) => {
+            const { roleId, isChecked } = e.detail;
+            
+            // topRoles 배열의 roleId와 비교
+            topRoles.forEach(topRole => {
+                if (topRole.roleId === roleId) {
+                    // 1뎁스 노드 찾기
+                    const firstLevelNode = document.querySelector(`#roleTree > .node[data-role-id="${roleId}"]`);
+
+                    if (firstLevelNode) {
+                        const actions = firstLevelNode.querySelector('.role-actions');
+                        if (actions) {
+                            // 이미 아이콘이 있는지 확인
+                            let denyIcon = actions.querySelector('.deny-icon');
+                            if (!denyIcon) {
+                                // 아이콘이 없으면 새로 생성
+                                denyIcon = document.createElement('span');
+                                denyIcon.className = 'deny-icon';
+                                denyIcon.innerHTML = '🚫';
+                                denyIcon.title = '하위 노드가 거부됨';
+                                actions.insertBefore(denyIcon, actions.firstChild);
+                            }
+                            denyIcon.style.display = isChecked ? 'inline-block' : 'none';
+                        }
+                    }
+                }
+            });
+        });
 
         // 검색 기능
         document.getElementById('searchInput').addEventListener('input', (e) => {
